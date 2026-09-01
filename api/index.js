@@ -86,6 +86,17 @@ app.get('/hello/:name', (req, res) => {
   res.json({ hello: req.params.name });
 });
 
+// --- Endpoint /tables ---
+// GET /tables -> liste les tables disponibles dans le schéma Supabase
+app.get('/tables', async (req, res) => {
+  const { baseUrl, serviceRoleKey } = supabaseConfig();
+  try {
+    const r = await fetch(`${baseUrl}/rest/v1/`, { headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` } });
+    const spec = await r.json();
+    res.json({ tables: Object.keys(spec.definitions || {}) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // --- Endpoint /data ---
 // GET /data -> renvoie les derniers enregistrements de `todos`
 app.get('/data', async (req, res) => {
