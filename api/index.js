@@ -116,7 +116,7 @@ app.get('/data', async (req, res) => {
   const cols = await getTodosColumns();
   const select = (cols.length ? cols : ['*']).join(',');
   try {
-    const r = await fetch(`${baseUrl}/rest/v1/todos?select=${encodeURIComponent(select)}&limit=50&order=created_at.desc,inserted_at.desc,id.desc`, { headers: H });
+    const r = await fetch(`${baseUrl}/rest/v1/todos?select=${encodeURIComponent(select)}&limit=50&order=id.desc`, { headers: H });
     if (!r.ok) return res.status(r.status).json({ error: await r.text() });
     res.json(await r.json());
   } catch (err) {
