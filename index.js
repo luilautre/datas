@@ -1,8 +1,10 @@
 // Entrypoint pour Vercel (root index.js)
-// Re-exporte le handler serverless depuis api/index.js
+// Import explicite d'Express pour que Vercel détecte l'usage d'Express
+// (On n'utilise pas directement l'objet ici — c'est juste pour la détection)
+require('express');
+
 const handler = require('./api/index');
 
-// Pour CommonJS
+// Exporte le handler serverless pour Vercel
 module.exports = handler;
-// Pour compatibilité ESM
 module.exports.default = handler;
