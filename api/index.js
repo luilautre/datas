@@ -141,6 +141,35 @@ app.get('/data', async (req, res) => {
   }
 });
 
+// --- Endpoint /exel ---
+// GET /exel?key=SECRET -> télécharge un fichier .xlsx (IP complète sans clé, tronquée sans)
+app.get('/exel', async (req, res) => {
+  const { baseUrl, serviceRoleKey } = supabaseConfig();
+  const H = { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` };
+  const cols = await getTodosColumns();
+  const select = (cols.length ? cols : ['*']).join(',');
+  const authToken = process.env.DATA_TOKEN;
+  const provided = (req.query.key || req.headers['x-data-key'] || '').toString();
+  const authenticated = !!(authToken && provided && provided === authToken);
+  try {
+    const r = await fetch(`${baseUrl}/rest/v1/todos?select=${encodeURIComponent(select)}&limit=1000&order=id.desc`, { headers: H });
+    if (!r.ok) return res.status(r.status).json({ error: await r.text() });
+    let rows = await r.json();
+    if (!authenticated && Array.isArray(rows)) {
+      rows = rows.map((row) => (row && row.ip ? { ...row, ip: truncateIp(row.ip) } : row));
+    }
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'todos');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="todos.xlsx"');
+    return res.send(Buffer.from(buf));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Endpoint /test ---
 // GET /test?source=xx&nom=xx
 //   1. enregistre { source, nom } dans la table `todos` (Supabase)
