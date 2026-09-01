@@ -3,6 +3,8 @@ const express = require('express');
 
 const app = express();
 app.use(express.json());
+// Vercel est devant un proxy : nécessaire pour récupérer la vraie IP du client
+app.set('trust proxy', true);
 
 // --- Configuration Supabase (intégration Vercel) ---
 // Le code lit les variables auto-injectées par l'intégration Supabase de Vercel :
@@ -36,7 +38,7 @@ async function getTodosColumns() {
 }
 
 // Construit le corps d'insertion selon les colonnes réelles de `todos`
-async function insertClick(source, nom) {
+async function insertClick(record) {
   const { baseUrl, serviceRoleKey } = supabaseConfig();
   const H = {
     'Content-Type': 'application/json',
@@ -47,17 +49,19 @@ async function insertClick(source, nom) {
 
   const cols = await getTodosColumns();
   const body = {};
-  if (cols.includes('source')) body.source = source;
-  if (cols.includes('nom')) body.nom = nom;
+  // Colonne dédiée présente ? On l'utilise directement.
+  const dedicated = ['source', 'nom', 'user_agent', 'referer', 'ip', 'accept_language', 'host'];
+  for (const c of dedicated) {
+    if (cols.includes(c) && record[c] != null) body[c] = record[c];
+  }
 
-  // Si la table n'a pas de colonnes source/nom dédiées,
-  // on stocke le tout en JSON dans une colonne texte (task par défaut).
-  if (!body.source && !body.nom) {
+  // Sinon, on stocke tout en JSON dans une colonne texte (task par défaut).
+  if (Object.keys(body).length === 0) {
     const textCol =
       cols.find((c) => ['task', 'texte', 'content', 'description', 'titre'].includes(c)) ||
       cols[0] ||
       'task';
-    body[textCol] = JSON.stringify({ source, nom });
+    body[textCol] = JSON.stringify(record);
   }
 
   const res = await fetch(`${baseUrl}/rest/v1/todos`, {
@@ -125,12 +129,21 @@ app.get('/data', async (req, res) => {
 //   1. enregistre { source, nom } dans la table `todos` (Supabase)
 //   2. redirige (HTTP 302) vers l'URL fixe configurée pour /test
 app.get('/test', async (req, res) => {
-  const source = (req.query.source || '').toString().slice(0, 200);
-  const nom = (req.query.nom || '').toString().slice(0, 200);
+  const h = req.headers;
+  // Toutes les données de tracking légalement stockables
+  const record = {
+    source: (req.query.source || '').toString().slice(0, 200),
+    nom: (req.query.nom || '').toString().slice(0, 200),
+    user_agent: (h['user-agent'] || '').toString().slice(0, 500),
+    referer: (h['referer'] || h['referrer'] || '').toString().slice(0, 500),
+    ip: ((h['x-forwarded-for'] || '').toString().split(',')[0].trim() || req.ip || '').slice(0, 64),
+    accept_language: (h['accept-language'] || '').toString().slice(0, 200),
+    host: (h['host'] || '').toString().slice(0, 200),
+  };
 
   // Enregistrement en base (non bloquant : on redirige même si la BdD plante)
   try {
-    await insertClick(source, nom);
+    await insertClick(record);
   } catch (err) {
     console.error('Supabase insert failed:', err.message);
   }
