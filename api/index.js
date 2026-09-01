@@ -109,16 +109,33 @@ app.get('/tables', async (req, res) => {
 });
 
 // --- Endpoint /data ---
-// GET /data -> renvoie les derniers enregistrements de `todos`
+// GET /data?key=SECRET -> IP complète. Sans clé -> IP tronquée.
+function truncateIp(ip) {
+  if (!ip) return ip;
+  const v4 = ip.split('.');
+  if (v4.length === 4) return v4.slice(0, 3).join('.') + '.0';
+  if (ip.includes(':')) {
+    const g = ip.split(':');
+    return g.slice(0, 4).join(':') + '::';
+  }
+  return ip;
+}
 app.get('/data', async (req, res) => {
   const { baseUrl, serviceRoleKey } = supabaseConfig();
   const H = { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` };
   const cols = await getTodosColumns();
   const select = (cols.length ? cols : ['*']).join(',');
+  const authToken = process.env.DATA_TOKEN;
+  const provided = (req.query.key || req.headers['x-data-key'] || '').toString();
+  const authenticated = !!(authToken && provided && provided === authToken);
   try {
     const r = await fetch(`${baseUrl}/rest/v1/todos?select=${encodeURIComponent(select)}&limit=50&order=id.desc`, { headers: H });
     if (!r.ok) return res.status(r.status).json({ error: await r.text() });
-    res.json(await r.json());
+    let rows = await r.json();
+    if (!authenticated && Array.isArray(rows)) {
+      rows = rows.map((row) => (row && row.ip ? { ...row, ip: truncateIp(row.ip) } : row));
+    }
+    res.json({ authenticated, count: Array.isArray(rows) ? rows.length : 0, rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
