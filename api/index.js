@@ -86,6 +86,22 @@ app.get('/hello/:name', (req, res) => {
   res.json({ hello: req.params.name });
 });
 
+// --- Endpoint /data ---
+// GET /data -> renvoie les derniers enregistrements de `todos`
+app.get('/data', async (req, res) => {
+  const { baseUrl, serviceRoleKey } = supabaseConfig();
+  const H = { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` };
+  const cols = await getTodosColumns();
+  const select = (cols.length ? cols : ['*']).join(',');
+  try {
+    const r = await fetch(`${baseUrl}/rest/v1/todos?select=${encodeURIComponent(select)}&limit=50&order=created_at.desc,inserted_at.desc,id.desc`, { headers: H });
+    if (!r.ok) return res.status(r.status).json({ error: await r.text() });
+    res.json(await r.json());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Endpoint /test ---
 // GET /test?source=xx&nom=xx
 //   1. enregistre { source, nom } dans la table `todos` (Supabase)
