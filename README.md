@@ -40,16 +40,19 @@ create table if not exists clicks (
 -- create policy "select public" on clicks for select using (true);
 ```
 
-### 3. Configurer les variables d'environnement sur Vercel
+### 3. Variables d'environnement sur Vercel
 
-Dans le projet Vercel `ll-links` :
+L'intégration Supabase de Vercel injecte automatiquement :
+`NEXT_PUBLIC_SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY`.
+Le code les lit directement — rien à ajouter si l'intégration est connectée.
 
-**Settings → Environment Variables** → ajouter (tous les environnements) :
+Sinon (variables définies à la main), ajouter dans
+**Settings → Environment Variables** :
 
-| Nom                   | Valeur                                  |
-|-----------------------|-----------------------------------------|
-| `SUPABASE_URL`        | `https://xxxxx.supabase.co`             |
-| `SUPABASE_SERVICE_ROLE` | la clé `service_role` (secrète)        |
+| Nom                          | Valeur                                  |
+|------------------------------|-----------------------------------------|
+| `NEXT_PUBLIC_SUPABASE_URL`   | `https://xxxxx.supabase.co`             |
+| `SUPABASE_SERVICE_ROLE_KEY`  | la clé `service_role` (secrète)         |
 
 ### 4. Déployer
 

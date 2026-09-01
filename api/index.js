@@ -1,23 +1,39 @@
 // api/index.js
 const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 app.use(express.json());
 
-// Client Supabase créé paresseusement (pour ne pas planter l'import en local sans .env)
-// Variables d'environnement à définir dans Vercel :
-//   SUPABASE_URL          -> https://xxxxx.supabase.co
-//   SUPABASE_SERVICE_ROLE -> clé service_role (secrète, insertion côté serveur)
-let _supabase = null;
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE
-    );
+// --- Configuration Supabase (intégration Vercel) ---
+// Le code lit les variables auto-injectées par l'intégration Supabase de Vercel :
+//   NEXT_PUBLIC_SUPABASE_URL   -> https://xxxxx.supabase.co
+//   SUPABASE_SERVICE_ROLE_KEY  -> clé service_role (secrète, insertion côté serveur)
+// (fallbacks : SUPABASE_URL / SUPABASE_SERVICE_ROLE si tu préfères les tiennes)
+function supabaseConfig() {
+  const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
+  if (!baseUrl || !serviceRoleKey) {
+    throw new Error('Variables Supabase manquantes (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)');
   }
-  return _supabase;
+  return { baseUrl: baseUrl.replace(/\/$/, ''), serviceRoleKey };
+}
+
+// Insertion directe via l'API REST PostgREST (fetch natif, pas de WebSocket)
+async function insertClick(source, nom) {
+  const { baseUrl, serviceRoleKey } = supabaseConfig();
+  const res = await fetch(`${baseUrl}/rest/v1/clicks`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': serviceRoleKey,
+      'Authorization': `Bearer ${serviceRoleKey}`,
+      'Prefer': 'return=minimal',
+    },
+    body: JSON.stringify({ source, nom }),
+  });
+  if (!res.ok) {
+    throw new Error(`Supabase insert HTTP ${res.status}: ${await res.text()}`);
+  }
 }
 
 // --- Mapping des destinations de redirection ---
@@ -49,9 +65,7 @@ app.get('/test', async (req, res) => {
 
   // Enregistrement en base (non bloquant : on redirige même si la BdD plante)
   try {
-    await getSupabase()
-      .from('clicks')
-      .insert({ source, nom });
+    await insertClick(source, nom);
   } catch (err) {
     console.error('Supabase insert failed:', err.message);
   }
