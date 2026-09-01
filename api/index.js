@@ -93,7 +93,14 @@ app.get('/tables', async (req, res) => {
   try {
     const r = await fetch(`${baseUrl}/rest/v1/`, { headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` } });
     const spec = await r.json();
-    res.json({ tables: Object.keys(spec.definitions || {}) });
+    res.json({
+      topKeys: Object.keys(spec),
+      paths: Object.keys(spec.paths || {}),
+      definitions: Object.keys(spec.definitions || {}),
+      schemas: Object.keys(spec.components?.schemas || {}),
+      swagger: spec.swagger || null,
+      openapi: spec.openapi || null,
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
