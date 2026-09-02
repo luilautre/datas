@@ -1,0 +1,17 @@
+{
+  "default": "https://luilautre.github.io",
+  "routes": {
+    "/test": {
+      "target": "https://luilautre.github.io",
+      "status": 302,
+      "active": true,
+      "note": "Redirection vers la page principale"
+    },
+    "/autre": {
+      "target": "https://example.com",
+      "status": 301,
+      "active": false,
+      "note": "Exemple, désactivé par défaut"
+    }
+  }
+}
