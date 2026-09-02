@@ -1,6 +1,8 @@
 // api/index.js
 const express = require('express');
 const XLSX = require('xlsx');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 app.use(express.json());
@@ -76,11 +78,27 @@ async function insertClick(record) {
 }
 
 // --- Mapping des destinations de redirection ---
-const REDIRECTS = {
-  '/test': 'https://luilautre.github.io',
-  // '/autre': 'https://example.com',
-};
-const DEFAULT_REDIRECT = 'https://luilautre.github.io';
+// Remplacé: on lit maintenant api/redirects.json si présent. Format attendu :
+// {
+//   "default": "https://...",
+//   "routes": {
+//     "/test": { "target": "https://...", "status": 302, "active": true }
+//   }
+// }
+let REDIRECTS = {};
+let DEFAULT_REDIRECT = 'https://luilautre.github.io';
+try {
+  const cfgPath = path.join(__dirname, 'redirects.json');
+  if (fs.existsSync(cfgPath)) {
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+    DEFAULT_REDIRECT = cfg.default || DEFAULT_REDIRECT;
+    for (const [p, info] of Object.entries(cfg.routes || {})) {
+      if (info && info.active !== false && info.target) REDIRECTS[p] = info.target;
+    }
+  }
+} catch (e) {
+  console.warn('redirects.json non chargé :', e.message);
+}
 
 // --- Routes existantes ---
 app.get('/', (req, res) => {
